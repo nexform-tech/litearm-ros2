@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>litearm_ros2</name>
+  <version>0.1.0</version>
+  <description>ROS2 (Humble) bridge package for the LiteArm robotic arm.</description>
+  <maintainer email="56000204@qq.com">luochun</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>litearm_interfaces</depend>
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf2_ros</depend>
+
+  <!--
+    litearm-python is NOT rosdep-resolvable.
+    Install it manually on the robot/desktop before running:
+      pip install litearm-python    # or: pip install /path/to/litearm-python
+    It must be importable from the same interpreter that runs this node.
+  -->
+  <exec_depend>python3</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

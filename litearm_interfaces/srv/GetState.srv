@@ -1,0 +1,7 @@
+---
+float64[] q
+float64[] dq
+float64[] tau
+string state
+bool fault
+string message

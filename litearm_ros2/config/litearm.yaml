@@ -1,0 +1,10 @@
+# litearm_ros2 node parameters (also overridable on the command line).
+litearm_node:
+  ros__parameters:
+    endpoint: "tcp/192.168.31.237:7447"   # Zenoh endpoint of the litearm-server
+    arm_id: "armA"                        # arm id registered on the server
+    loop_hz: 50.0                         # state publish rate (Hz)
+    cmd_speed: 0.5                        # default joint move speed (0..1)
+    joint_names: ["joint0", "joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
+    base_frame: "base_link"
+    tcp_frame: "tool0"
