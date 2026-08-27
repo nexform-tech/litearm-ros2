@@ -95,7 +95,7 @@ class LiteArmNode(Node):
 
     def _param(self, name: str, default):
         try:
-            return self.get_parameter(name).get_parameter_value().get_value()
+            return self.get_parameter(name).value
         except Exception:
             return default
 

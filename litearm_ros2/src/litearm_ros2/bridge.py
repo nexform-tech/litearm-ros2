@@ -21,7 +21,10 @@ class LiteArmBridge:
 
     def read_joint_state(self) -> Optional[Dict]:
         """sensor_msgs/JointState fields, or None before the first broadcast."""
-        state = self.arm.get_state()
+        try:
+            state = self.arm.get_state()
+        except Exception:
+            return None
         if state is None:
             return None
         return {
@@ -40,7 +43,10 @@ class LiteArmBridge:
         return litearm_pose_to_xyz_quat(pose)
 
     def get_state(self) -> Optional[Dict]:
-        state = self.arm.get_state()
+        try:
+            state = self.arm.get_state()
+        except Exception:
+            return None
         if state is None:
             return None
         return {
@@ -81,7 +87,7 @@ class LiteArmBridge:
         """Return (q, success, message)."""
         try:
             pose = xyz_quat_to_litearm_pose(xyz_quat)
-            q, success = self.arm.ik(pose, q_seed=list(q_seed) if q_seed else None)
+            q, success = self.arm.ik(pose[0], pose[1], q_seed=list(q_seed) if q_seed else None)
             return [float(v) for v in q], bool(success), "ok"
         except Exception as exc:
             return None, False, str(exc)

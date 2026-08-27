@@ -36,8 +36,8 @@ class FakeArm:
         self.calls.append(("fk", list(q)))
         return ([0.3, 0.0, 0.4], _IDENTITY)
 
-    def ik(self, pose, q_seed=None):
-        self.calls.append(("ik", pose, q_seed))
+    def ik(self, pos_d, R_d, q_seed=None):
+        self.calls.append(("ik", pos_d, R_d, q_seed))
         return [0.1] * 7, True
 
     def request_stop(self):
