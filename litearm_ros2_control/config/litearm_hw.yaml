@@ -1,0 +1,102 @@
+# litearm_hw.yaml — PC-side run-time parameters for the hardware daemon (**optional**).
+#
+# Usage: ros2 launch litearm_ros2_control litearm_control.launch.py \
+#           hw_config:=<absolute path to this file>
+# or directly: litearm_hw_daemon --hw-config <path>
+#
+# Precedence: **command line > this file > the defaults in the code**.
+# So a temporary change does not require editing here; just add the command
+# line argument (the reverse does not work — the file cannot override the
+# command line, and that is deliberate: a temporary change should not be
+# silently overridden by a file someone forgot to delete).
+#
+# ⚠ **Only PC-side concepts** belong here. The single source of truth for
+#   joint-level parameters (kp / kd / tau_max / soft limits / ff_mask /
+#   kd_extra / hold_kp_gain) is **the firmware parameter table**; the daemon
+#   reads it back with 0x24 / 0x2B / 0x2C at startup and prints it in the
+#   "firmware identity" block of the startup log. Writing a second copy here
+#   would be a second truth — change one place and not the other and the
+#   symptom is "I set it and nothing happens", which is very hard to track
+#   down.
+#
+# Unknown keys **raise an error** (they are not silently ignored). That is
+# deliberate: a config file typo quietly keeping the old value is one of the
+# hardest classes of problem to track down.
+
+transport:
+  # USB CDC device path. Empty = auto-discover from /sys/class/tty by VID:PID
+  # 1d50:606f (the device name can change after the board re-enumerates, so
+  # auto-discovery is less hassle; an explicit path suits multi-board setups).
+  port: ""
+
+  # Command publish rate. The firmware control loop is 300Hz and the command
+  # watchdog 100ms, so 250Hz (4ms) leaves a 25× margin. Lowering it towards
+  # 10Hz starts to hug the watchdog.
+  rate_hz: 250.0
+
+  # Command frame staleness threshold: beyond it, "the ROS-side control loop
+  # has stopped" is taken to be true and the daemon switches to holding
+  # position.
+  # It must be >= one control period and clearly below the firmware's 100ms
+  # watchdog, so the daemon reacts before the firmware does (actively
+  # publishing hold references, which beats the firmware's fail-soft 0.6×
+  # stiffness).
+  command_timeout_s: 0.1
+
+  # State frame staleness threshold: the firmware reports spontaneously at
+  # 100Hz; beyond it the link is considered down.
+  feedback_timeout_s: 0.08
+
+  # Retry interval after a failed connection (port absent / firmware not
+  # answering / enable did not succeed).
+  connect_retry_s: 2.0
+
+  # Timeout, after ENABLE, for waiting until the axis is "really energised"
+  # (the enabled bit in the state frame). The firmware does it in two stages:
+  # the ACK only registers the request, and it energises once feedback is
+  # complete. Typically <100ms when warm; longer on a cold start / with
+  # feedback loss.
+  arm_timeout_s: 5.0
+
+  # Timeout for a single reply to the startup configuration queries (version /
+  # joint parameters / ff_mask). The firmware's TX is "drop when busy", so a
+  # reply can be lost; this is therefore "how long until it counts as lost",
+  # not "how long it must take to answer".
+  request_timeout_s: 0.5
+
+policy:
+  # Command channel:
+  #   false = MOVE_JS position mode (default): the PD loop and the
+  #           gravity/friction/integral/kd_extra feedforward are all computed
+  #           by the firmware; the price is no M·q̈ or C·q̇ (MOVE_JS has no
+  #           acceleration source).
+  #   true  = full MIT_ALL passthrough: kp/kd/effort take effect per frame and
+  #           the firmware adds none of its own feedforward — the ROS side or
+  #           the user supplies it. For A/B comparison and "I want to compute
+  #           it myself".
+  mit_passthrough: false
+
+  # Seconds to keep publishing hold references before exiting. During that
+  # time the firmware still adds the gravity feedforward and the arm stays
+  # put; after it, 0x20 park is sent (1.0× stiffness but tau=0, so there is a
+  # slight sag).
+  # 0 = park and exit immediately. A second Ctrl-C during teardown skips it at
+  # once.
+  exit_hold_s: 2.0
+
+  # Feedforward overrides: **empty by default = the firmware's ff_mask is left
+  # completely alone** (the firmware has its own factory mask).
+  # Write only the items you want to change; the rest keep the firmware's
+  # current value. The daemon reads them back to verify after writing.
+  #
+  #   gravity   → FF_G
+  #   friction  → FF_FRICTION
+  #   inertia   → FF_INERTIA|FF_CORIOLIS (⚠ under MOVE_JS the firmware does
+  #               not compute the inertia term, so setting the bit is useless)
+  #   integral  → FF_INTEGRAL
+  #   damping   → the kd_extra vector (no separate FF bit; false = zero it)
+  #
+  # Falling back to pure PD for an A/B comparison:
+  #   ff_overrides: {gravity: false, friction: false, inertia: false,
+  #                  integral: false, damping: false}
+  ff_overrides: {}

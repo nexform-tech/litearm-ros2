@@ -1,0 +1,224 @@
+# litearm_controllers.yaml — controller_manager and controller configuration.
+#
+# The joint order is always joint1..joint7 (matching the firmware joint frame
+# and the shared memory array).
+#
+# About update_rate
+# -----------------
+# The hardware interface's read()/write() are shared memory memcpy (no locking,
+# no serial port, no Python), so the CM loop itself is cheap. The hardware
+# daemon runs independently at 250Hz, continuously publishing MOVE_JS to the
+# firmware; update_rate here only decides the granularity of command refreshes
+# and the interpolation step of JTC.
+#
+# 250Hz = 1:1 with the daemon: every control cycle reads and writes one frame,
+# and what it reads is always the fresh state frame just published; when the
+# two run at different rates (200/250, say), some cycles read the same frame
+# again and write the same command again, which is equivalent to a reference
+# step at the 50Hz beat frequency.
+controller_manager:
+  ros__parameters:
+    update_rate: 250  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    # Optional: entry points for passing kp / kd through per frame.
+    # ⚠ **Only effective when the daemon is started with --mit-passthrough**:
+    #   on the default MOVE_JS position channel kp/kd come from the firmware
+    #   parameter table (jp->mit_kp/mit_kd), and the kp/kd in the command frame
+    #   are not forwarded at all — loading these two controllers has no effect
+    #   whatsoever.
+    #   To adjust stiffness on the default channel, change the firmware
+    #   parameters (0x22 / the USB tool), or flip mit_passthrough in
+    #   litearm_hw.yaml and restart the daemon.
+    litearm_kp_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    litearm_kd_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    # Servo controller (the litearm_servo_control package). **Loaded but not
+    # activated by default**: it and JTC both claim the position+velocity of
+    # joint1..7 and only one can be active at a time, so at startup a spawner
+    # --inactive leaves it sitting there, and you hand over explicitly when you
+    # actually need it:
+    #   ros2 run litearm_servo_control servo_switch.py --to servo
+    # Why not just reuse JTC: JTC is a trajectory follower, not a passthrough,
+    # so streaming single-point commands get interpolated and the "trajectory
+    # end" criterion is evaluated continuously, aborting the whole trajectory
+    # as soon as the tolerance is exceeded (error_code=-4). See
+    # litearm_servo_control/README.md.
+    litearm_servo_controller:
+      type: litearm_servo_control/LitearmServoController
+
+# ── joint trajectory controller (the workhorse) ─────────────────────────────
+#
+# command_interfaces may only take one of the following combinations (a hard
+# constraint of the Humble JTC):
+#   [position]                      —— position only
+#   [position, velocity]            —— position + velocity feedforward  ← this config
+#   [position, velocity, acceleration]  —— plus acceleration feedforward
+#   [effort]                        —— torque only (must be used on its own)
+#
+# [position, velocity] is chosen here: the daemon's default MOVE_JS channel
+# only consumes these two fields, mapping them to the firmware's (q_ref, dq_ref),
+# and the firmware internally runs
+#   tau = kp·(q_ref−q) + kd·(dq_ref−dq) + G(q) + friction + integral + kd_extra
+#
+# ⚠ Why acceleration is **not** wanted:
+#   the acceleration feedforward M(q)·q̈ is currently computed in the firmware,
+#   and **only in MOVE_J mode** (MOVE_JS has no acceleration source; the
+#   firmware source comment reads: "no acceleration source (trapezoidal
+#   limiting, not S-curve): M·ddq is not guessed"). So whatever JTC supplies
+#   for acceleration never reaches anywhere — declaring it only makes people
+#   believe the inertia feedforward is on.
+#   If you really need the M·q̈ path, compute it yourself with
+#   --mit-passthrough and change this to [position, velocity, effort] (effort
+#   must be used alone or combined with position, see the JTC constraints).
+#
+# ⚠ For the same reason, no effort: MOVE_JS on the default channel
+#   **deliberately carries no tau_ff** — the firmware's builtin_mode requires
+#   `MOVE_JS && !s_js_user_ff`, and as soon as a tau appears in the payload
+#   (even all zeros) it switches off the whole built-in feedforward
+#   (G/friction/integral/kd_extra/quantisation compensation). See hw_daemon.py.
+joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+      - joint7
+    command_interfaces: [position, velocity]
+    state_interfaces: [position, velocity]
+
+    # The tracking tolerances come from the firmware's following_error
+    # criterion: [0.35, 0.35, 0.30, 0.30, 0.25, 0.25, 0.25] rad.
+    #
+    # ⚠️ Do not tighten them casually. As soon as JTC sees |reference position −
+    # measured position| exceed the tolerance it **aborts the whole trajectory**
+    # (reporting "State tolerances failed" + error_code=-4) rather than just
+    # logging a warning. These numbers are the project's own "keeps up"
+    # criterion: **the firmware's safety_check uses exactly them**
+    # (joint[].following_error in params/defaults.c; once triggered the firmware
+    # sets joint_fault and disables that axis). Tighter than that would declare
+    # loss of control before the firmware does.
+    #
+    # The consistency is guarded by test/test_controller_config.py: it asserts
+    # that the trajectory tolerance here must not be smaller than the
+    # following_error in the firmware parameter table.
+    # The goal tolerance is 0.02: the firmware's goal criterion is 0.015, which
+    # leaves a little margin for the steady-state droop caused by feedforward
+    # residuals (when the model/load parameters are off).
+    constraints:
+      stopped_velocity_tolerance: 0.03   # firmware stopped_velocity criterion
+      goal_time: 3.0                     # firmware goal window
+      joint1: {trajectory: 0.35, goal: 0.02}
+      joint2: {trajectory: 0.35, goal: 0.02}
+      joint3: {trajectory: 0.30, goal: 0.02}
+      joint4: {trajectory: 0.30, goal: 0.02}
+      joint5: {trajectory: 0.25, goal: 0.02}
+      joint6: {trajectory: 0.25, goal: 0.02}
+      joint7: {trajectory: 0.25, goal: 0.02}
+
+    allow_partial_joints_goal: false
+    open_loop_control: false
+    allow_integration_in_goal_trajectories: true
+
+# ── kp / kd passthrough entry points (only with --mit-passthrough) ───────────
+#
+# Usage: publish a Float64MultiArray to <name>/commands (7 elements, in the
+# order joint1..joint7):
+#
+#   ros2 topic pub -1 /litearm_kp_controller/commands \
+#     std_msgs/msg/Float64MultiArray "{data: [150,150,150,150,20,20,20]}"
+#
+# ⚠ Precondition: the daemon is started with --mit-passthrough. On the default
+#   MOVE_JS channel these two controllers are **completely inert** (the kp/kd
+#   in the command frame are not forwarded to the firmware), so loading them
+#   neither errors nor has any effect.
+# Note: kp/kd are ultimately "MIT gains inside the motor firmware" — smaller is
+# softer (an external force can push the axis), larger is stiffer. The kd range
+# is (0,5]; kd=0 oscillates.
+litearm_kp_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6, joint7]
+    interface_name: kp
+
+litearm_kd_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6, joint7]
+    interface_name: kd
+
+# ── servo controller (litearm_servo_control) ────────────────────────────────
+#
+# Input: trajectory_msgs/JointTrajectory streamed down by moveit_servo
+#        (a single trajectory point carrying positions and velocities).
+#        **It must be a JointTrajectory**: Float64MultiArray can only carry one
+#        field (positions and velocities are else-if branches, see the output
+#        branches in servo_calcs.cpp), whereas this robot's firmware requires
+#        position and velocity together.
+# Output: the position + velocity command interfaces of joint1..7 — equivalent
+#        to the (q_ref, dq_ref) the firmware wants. **Position alone is not
+#        enough**: velocity=0 makes the firmware freeze the reference and the
+#        joint does not move.
+#
+# Mutually exclusive with JTC (both claim the same two interfaces); hand over
+# with:
+#   ros2 run litearm_servo_control servo_switch.py --to servo|moveit|--status
+#
+# ⚠ The hand-over must happen while the **arm is at rest**; the script refuses
+#   to switch during motion by default (--force skips that).
+litearm_servo_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6, joint7]
+
+    # moveit_servo's command_out_topic must point here (see
+    # config/servo_config.yaml in litearm_manipulation). It is hard-coded as an
+    # **absolute name**: whether `~/` resolves to the controller's own node
+    # name in YAML is not obvious, and this must match the servo side's publish
+    # target word for word.
+    joint_trajectory_topic: /litearm_servo_controller/joint_trajectory
+
+    # Command starvation criterion: with no new command for longer than this,
+    # write velocity=0 and freeze the reference.
+    # 0.2s is chosen as: moveit_servo's publish_period is 0.034s (≈29Hz, see
+    # servo_config.yaml), plus the sampling jitter on the vision side; 0.2s
+    # amounts to "5~6 frames lost in a row" before starvation is declared — so
+    # it does not freeze spuriously on an occasional dropped frame, yet still
+    # pulls out quickly when the stream really stops.
+    command_timeout_s: 0.2
+
+    # Hard velocity clamp (rad/s). **This is a loss-of-control guard rail, not
+    # a tuning knob.**
+    # Under command_in_type: speed_units, moveit_servo's PID output is directly
+    # in m/s with no hard saturation (see SERVO_DESIGN.md §6.5), so the clamp
+    # lives here.
+    # 1.0 rad/s ≈ 57°/s: far above any legitimate motion magnitude in the
+    # approach phase (a TCP 3cm/s corresponds to a joint magnitude of
+    # ~0.06 rad/s), and far below the magnitude that would trigger the firmware
+    # overspeed safety (speed_limit → joint_fault).
+    # It can be tightened after tuning on real hardware; 0 = clamp off (not
+    # recommended).
+    max_velocity: 1.0
+
+# ── torque-only mode (only with --mit-passthrough, spare) ───────────────────
+#
+# To have JTC command torque directly instead of position, change
+# command_interfaces of the joint_trajectory_controller above to [effort] (it
+# must be used on its own in the Humble JTC), **and** zero out kp/kd —
+# otherwise the firmware still runs the kp·(q_ref−q) position loop internally
+# and effort is merely an added feedforward (which is also the MIT_ALL
+# semantics: the firmware adds none of its own feedforward):
+#
+#   ros2 topic pub -1 /litearm_kp_controller/commands \
+#     std_msgs/msg/Float64MultiArray "{data: [0,0,0,0,0,0,0]}"
+#
+# At that point make sure the arm is supported: kp=0 means there is no position
+# holding force.

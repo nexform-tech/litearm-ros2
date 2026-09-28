@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<!--
+  litearm.ros2_control.xacro — the ros2_control hardware interface declaration
+  for litearm.
+
+  This file only "declares" things and holds no kinematics: the joints and links
+  come from the upstream litearm description package
+  (robot_description/litearm). Usage:
+
+      <xacro:include filename="$(find litearm)/urdf/litearm.urdf"/>
+      <xacro:include filename="$(find litearm_ros2_control)/urdf/litearm.ros2_control.xacro"/>
+
+  Interface mapping (see litearm_system.hpp and hw_daemon.py for details):
+
+    **The default channel (MOVE_JS position mode) only consumes position and
+    velocity**, mapping them to the firmware's (q_ref, dq_ref); the PD gains
+    and the gravity/friction/integral/kd_extra feedforward are all computed in
+    the firmware. effort / kp / kd / acceleration are **not forwarded** on this
+    channel.
+
+    The other channel (the daemon's mit-passthrough switch) uses full MIT_ALL
+    passthrough: kp/kd/effort take effect per frame and the firmware adds none
+    of its own feedforward, which the ROS side provides instead.
+
+  So the four command interfaces below (effort / kp / kd / acceleration) are
+  **declared to keep the fallback channel usable**: an interface that no
+  controller claims is inert and has no side effects. The default stack claims
+  only position + velocity (see config/litearm_controllers.yaml).
+
+  Every xacro:arg carries the litearm_ prefix so the names cannot clash with
+  those of other included files.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Shared memory segment name: must match the shm-name argument of the
+       hardware daemon -->
+  <xacro:arg name="litearm_shm_name" default="/litearm_hw"/>
+
+  <!-- Default MIT gains. The values equal mit_kp / mit_kd of the corresponding
+       joints in the firmware parameter table (litearm-stm32's
+       params/defaults.c) — the two sides match value for value, the
+       consistency is guarded by test/test_controller_config.py, and changing
+       one requires syncing the other.
+
+       Why both must exist: on the default channel the copy that actually
+       takes effect is **the firmware's** (the mit_kp/mit_kd the daemon reads
+       back with 0x24); this copy is only written into the command frame by the
+       plugin on the mit-passthrough channel. While the two disagree the
+       default channel works as usual, but switching to the fallback channel
+       suddenly changes the stiffness — hence the sync requirement anyway.
+
+       Note that the hard range of a Damiao MIT frame is kp∈[0,500],
+       kd∈[0,5]. -->
+  <xacro:arg name="litearm_default_kp" default="400,400,300,300,50,50,50"/>
+  <xacro:arg name="litearm_default_kd" default="5,5,4,5,2.5,2.5,2.5"/>
+
+  <!-- Diagnostic state interfaces (temperature_mos / temperature_coil /
+       error_code / feedback_age). They are not part of the standard trio, so
+       joint_state_broadcaster will not claim them, and controller_manager
+       warns during activation that these interfaces are unclaimed — that is
+       expected. Set it to false if the noise bothers you. -->
+  <xacro:arg name="litearm_export_diagnostics" default="true"/>
+
+  <!-- Timeout for waiting until the daemon is ready (seconds). Port not
+       found / license not activated / motor feedback not ready all raise an
+       error here, and the message carries the specific reason the daemon
+       gave. -->
+  <xacro:arg name="litearm_connect_timeout_s" default="10.0"/>
+
+  <!-- Daemon heartbeat timeout (seconds). Exceeding it means the daemon is
+       considered dead: the hardware interface raises an error ->
+       controller_manager stops the controllers, so nothing keeps planning
+       against a frozen state. -->
+  <xacro:arg name="litearm_heartbeat_timeout_s" default="1.0"/>
+
+  <!-- Whether to request motor disable on shutdown. Default false: disabling
+       makes the arm go limp and drop. The daemon exits through the park
+       high-stiffness hold path instead, so the arm stays where it is. -->
+  <xacro:arg name="litearm_disable_on_shutdown" default="false"/>
+
+  <!-- Interface declaration for a single joint. The seven axes are completely
+       identical, so a macro avoids seven copies.
+       ⚠ All six command interfaces are declared, but **the default channel
+       only consumes position + velocity**: effort / kp / kd / acceleration
+       only really take effect when the daemon is started with
+       mit-passthrough. Keeping the declarations is what makes the fallback
+       channel usable (an interface nobody claims is inert). -->
+  <xacro:macro name="litearm_joint_interfaces" params="name">
+    <joint name="${name}">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="acceleration"/>
+      <command_interface name="effort"/>
+      <command_interface name="kp"/>
+      <command_interface name="kd"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <!-- For a DC motor τ is a current estimate: it includes friction and is
+           noisy, so use it for identification/contact detection, not as
+           high-rate control feedback. -->
+      <state_interface name="effort"/>
+      <xacro:if value="$(arg litearm_export_diagnostics)">
+        <state_interface name="temperature_mos"/>
+        <state_interface name="temperature_coil"/>
+        <state_interface name="error_code"/>
+        <state_interface name="feedback_age"/>
+      </xacro:if>
+    </joint>
+  </xacro:macro>
+
+  <ros2_control name="LitearmSystem" type="system">
+    <hardware>
+      <plugin>litearm_ros2_control/LitearmSystem</plugin>
+      <param name="shm_name">$(arg litearm_shm_name)</param>
+      <param name="default_kp">$(arg litearm_default_kp)</param>
+      <param name="default_kd">$(arg litearm_default_kd)</param>
+      <param name="export_diagnostic_interfaces">$(arg litearm_export_diagnostics)</param>
+      <param name="connect_timeout_s">$(arg litearm_connect_timeout_s)</param>
+      <param name="heartbeat_timeout_s">$(arg litearm_heartbeat_timeout_s)</param>
+      <param name="disable_on_shutdown">$(arg litearm_disable_on_shutdown)</param>
+    </hardware>
+
+    <xacro:litearm_joint_interfaces name="joint1"/>
+    <xacro:litearm_joint_interfaces name="joint2"/>
+    <xacro:litearm_joint_interfaces name="joint3"/>
+    <xacro:litearm_joint_interfaces name="joint4"/>
+    <xacro:litearm_joint_interfaces name="joint5"/>
+    <xacro:litearm_joint_interfaces name="joint6"/>
+    <xacro:litearm_joint_interfaces name="joint7"/>
+  </ros2_control>
+
+</robot>

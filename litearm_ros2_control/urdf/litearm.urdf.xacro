@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  litearm.urdf.xacro — the complete robot description for litearm (kinematics
+  + ros2_control declaration).
+
+  The kinematics proper live in the litearm description package (src/litearm
+  inside this workspace, an upstream snapshot of the robot_description/
+  repository): this file pulls it in with xacro:include and then appends the
+  <ros2_control> declaration of this adapter layer. To change the URDF, edit
+  only src/litearm and rebuild this workspace for it to take effect.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="litearm">
+  <xacro:include filename="$(find litearm)/urdf/litearm.urdf"/>
+  <xacro:include filename="$(find litearm_ros2_control)/urdf/litearm.ros2_control.xacro"/>
+</robot>
