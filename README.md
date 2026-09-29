@@ -5,12 +5,13 @@ robotic arm. It wraps [litearm-python](https://pypi.org/project/litearm-python)
 so the arm appears as standard ROS2 topics, transforms and services: joint
 states, TCP pose + TF, joint commands, and `movej`/`movel`/`fk`/`ik` services.
 
-The workspace contains two standard packages:
+The workspace contains three standard packages:
 
 | Package | Type | Role |
 |---|---|---|
 | `litearm_interfaces` | ament_cmake | Custom services: `Movej`, `Movel`, `Fk`, `Ik`, `GetState` |
 | `litearm_ros2` | ament_python | Bridge node + ROS-agnostic core (`bridge.py`, `pose_utils.py`) |
+| `litearm_ros2_control` | ament_cmake | `ros2_control` hardware interface: C++ `SystemInterface` plugin, POSIX shared-memory contract and a Python hardware daemon owning the USB CDC link |
 
 ```text
 ROS2 topics / services ──→ litearm_node ──→ LiteArmBridge ──→ litearm.Arm ──→ litearm-server
@@ -301,6 +302,15 @@ litearm-ros2/
 │   ├── launch/litearm.launch.py
 │   ├── config/litearm.yaml
 │   └── tests/                 mock unit tests (no ROS required)
+├── litearm_ros2_control/      ament_cmake package: ros2_control hardware interface
+│   ├── include/litearm_ros2_control/
+│   │   ├── litearm_shm.h      cross-language shared-memory layout contract
+│   │   └── litearm_system.hpp hardware_interface::SystemInterface plugin
+│   ├── src/                   C++ plugin and shared-memory C API
+│   ├── python/                hardware daemon owning the USB CDC link
+│   ├── launch/                ros2_control launch files
+│   ├── config/                controller and hardware configuration
+│   └── urdf/                  URDF and ros2_control xacro
 ├── docs/
 └── .markdownlint.json
 ```

@@ -1,0 +1,15 @@
+<library path="litearm_ros2_control">
+  <class
+    name="litearm_ros2_control/LitearmSystem"
+    type="litearm_ros2_control::LitearmSystem"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ros2_control system hardware interface for the seven-axis litearm arm.
+      The plugin does not access USB/CAN directly: it exchanges commands and
+      joint states with a Python daemon (litearm_hw_daemon, which owns the USB
+      CDC link to the litearm-stm32 firmware) through shared memory protected
+      by a seqlock, so read()/write() are lock-free memcpy and no Python runs
+      in the real-time loop.
+    </description>
+  </class>
+</library>

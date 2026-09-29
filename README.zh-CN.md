@@ -5,12 +5,13 @@
 ROS2 话题、坐标变换和服务出现：关节状态、TCP 位姿 + TF、关节指令，以及
 `movej`/`movel`/`fk`/`ik` 服务。
 
-工作区包含两个标准包：
+工作区包含三个标准包：
 
 | 包 | 类型 | 作用 |
 |---|---|---|
 | `litearm_interfaces` | ament_cmake | 自定义服务：`Movej`、`Movel`、`Fk`、`Ik`、`GetState` |
 | `litearm_ros2` | ament_python | 桥接节点 + 与 ROS 无关的核心（`bridge.py`、`pose_utils.py`） |
+| `litearm_ros2_control` | ament_cmake | `ros2_control` 硬件接口：C++ `SystemInterface` 插件、POSIX 共享内存契约，以及独占 USB CDC 链路的 Python 硬件守护进程 |
 
 ```text
 ROS2 话题 / 服务 ──→ litearm_node ──→ LiteArmBridge ──→ litearm.Arm ──→ litearm-server
@@ -38,7 +39,7 @@ ROS2 话题 / 服务 ──→ litearm_node ──→ LiteArmBridge ──→ li
 
 ## 概述与架构
 
-本工作区是一个 **colcon** 工作区，含两个包。接口包 `litearm_interfaces` 存放
+本工作区是一个 **colcon** 工作区，含三个包。接口包 `litearm_interfaces` 存放
 自定义服务（必须是 ament_cmake 包，因为 ROS2 在 CMake 阶段生成接口）；桥接包
 `litearm_ros2` 提供单个节点 `litearm_node`，通过 Zenoh endpoint 连接运行中的
 **litearm-server**：
@@ -69,7 +70,7 @@ ROS2 话题 / 服务 ──→ litearm_node ──→ LiteArmBridge ──→ li
 
 ```bash
 source /opt/ros/humble/setup.bash
-cd <本仓库>                        # 工作区根目录（两个包）
+cd <本仓库>                        # 工作区根目录（三个包）
 
 # 把基础 SDK 装进运行节点的 python：
 pip install litearm-python         # 或：pip install -e /path/to/litearm-python
@@ -292,6 +293,15 @@ litearm-ros2/
 │   ├── launch/litearm.launch.py
 │   ├── config/litearm.yaml
 │   └── tests/                 mock 单元测试（无需 ROS）
+├── litearm_ros2_control/      ament_cmake 包：ros2_control 硬件接口
+│   ├── include/litearm_ros2_control/
+│   │   ├── litearm_shm.h      跨语言共享内存布局契约
+│   │   └── litearm_system.hpp hardware_interface::SystemInterface 插件
+│   ├── src/                   C++ 插件与共享内存 C API
+│   ├── python/                独占 USB CDC 链路的硬件守护进程
+│   ├── launch/                ros2_control 启动文件
+│   ├── config/                控制器与硬件配置
+│   └── urdf/                  URDF 与 ros2_control xacro
 ├── docs/
 └── .markdownlint.json
 ```
