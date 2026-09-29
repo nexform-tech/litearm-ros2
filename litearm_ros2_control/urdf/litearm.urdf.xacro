@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!--
+  litearm.urdf.xacro — litearm 的完整机器人描述（运动学 + ros2_control 声明）。
+
+  运动学本体在 litearm 描述包里（工作区自带的 src/litearm，上游快照自
+  robot_description/ 仓库）：这里用 xacro:include 引入它，再追加本适配层的
+  <ros2_control> 声明。改 URDF 只改 src/litearm，本工作区重新 build 即可生效。
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="litearm">
+  <xacro:include filename="$(find litearm)/urdf/litearm.urdf"/>
+  <xacro:include filename="$(find litearm_ros2_control)/urdf/litearm.ros2_control.xacro"/>
+</robot>

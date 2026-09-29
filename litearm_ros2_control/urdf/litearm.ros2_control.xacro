@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<!--
+  litearm.ros2_control.xacro — litearm 的 ros2_control 硬件接口声明。
+
+  本文件只负责"声明"，不含任何运动学：关节与 link 由上游 litearm 描述包
+  （robot_description/litearm）提供。用法：
+
+      <xacro:include filename="$(find litearm)/urdf/litearm.urdf"/>
+      <xacro:include filename="$(find litearm_ros2_control)/urdf/litearm.ros2_control.xacro"/>
+
+  接口映射（详见 litearm_system.hpp 与 hw_daemon.py）：
+
+    **默认通道（MOVE_JS 位置模式）只消费 position 与 velocity**，把它们映射到
+    固件的 (q_ref, dq_ref)；PD 增益与重力/摩擦/积分/kd_extra 前馈全在固件里算。
+    effort / kp / kd / acceleration 在这条通道上**不会被转发**。
+
+    另一条通道（守护进程的 mit-passthrough 开关）走 MIT_ALL 全透传：
+    kp/kd/effort 逐帧生效、固件不叠任何自家前馈，前馈由 ROS 侧自己提供。
+
+  所以下面四条命令接口（effort / kp / kd / acceleration）**保留声明是为了让
+  回退通道可用**：接口没被控制器 claim 时就是惰性的，不产生副作用。
+  默认栈只 claim position + velocity（见 config/litearm_controllers.yaml）。
+
+  所有 xacro:arg 都带 litearm_ 前缀，避免与其他包含文件的参数名冲突。
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- 共享内存段名：必须与硬件守护进程的 shm-name 参数一致 -->
+  <xacro:arg name="litearm_shm_name" default="/litearm_hw"/>
+
+  <!-- 默认 MIT 增益。取值 = 固件参数表（litearm-stm32 的 params/defaults.c）
+       里对应关节的 mit_kp / mit_kd —— 两侧逐值一致，一致性由
+       test/test_controller_config.py 守着，改一处必须同步另一处。
+
+       为什么两处都要有：默认通道下真正生效的是**固件那一份**（守护进程用
+       0x24 读回来的 mit_kp/mit_kd）；这里这份只在 mit-passthrough 通道下
+       被插件写进命令帧。两处不一致时默认通道照常工作，而切到回退通道会突然
+       换一套刚度——所以还是要求同步。
+
+       注意达妙 MIT 帧的硬性范围是 kp∈[0,500]、kd∈[0,5]。 -->
+  <xacro:arg name="litearm_default_kp" default="400,400,300,300,50,50,50"/>
+  <xacro:arg name="litearm_default_kd" default="5,5,4,5,2.5,2.5,2.5"/>
+
+  <!-- 诊断状态接口（temperature_mos / temperature_coil / error_code / feedback_age）。
+       它们不属于标准三件套，joint_state_broadcaster 不会 claim，
+       controller_manager 激活时会提示"这些接口无人认领"——属预期现象。
+       嫌吵就设为 false。 -->
+  <xacro:arg name="litearm_export_diagnostics" default="true"/>
+
+  <!-- 等待守护进程就绪的超时（秒）。端口没找到 / license 未激活 / 电机反馈没就绪
+       都会在这里报错，报错信息会带上守护进程给出的具体原因。 -->
+  <xacro:arg name="litearm_connect_timeout_s" default="10.0"/>
+
+  <!-- 守护进程心跳超时（秒）。超过即判定守护进程已死，硬件接口报错 ->
+       controller_manager 停控制器，避免对着冻结的状态继续规划。 -->
+  <xacro:arg name="litearm_heartbeat_timeout_s" default="1.0"/>
+
+  <!-- 关闭时是否请求失能电机。默认 false：失能会让臂失力下坠。
+      守护进程退出走的是 park 高刚度持位路径，臂会保持原位。 -->
+  <xacro:arg name="litearm_disable_on_shutdown" default="false"/>
+
+  <!-- 单个关节的接口声明。七轴完全同构，用宏避免 7 份重复。
+       ⚠ 六条命令接口全都声明，但**默认通道只消费 position + velocity**：
+       effort / kp / kd / acceleration 只有守护进程以 mit-passthrough 启动时
+       才真正生效。保留声明是为了回退通道可用（没被 claim 的接口是惰性的）。 -->
+  <xacro:macro name="litearm_joint_interfaces" params="name">
+    <joint name="${name}">
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="acceleration"/>
+      <command_interface name="effort"/>
+      <command_interface name="kp"/>
+      <command_interface name="kd"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <!-- DC 电机 τ 为电流估计值，含摩擦、噪声大；供辨识/接触检测，
+           不做高频控制反馈。 -->
+      <state_interface name="effort"/>
+      <xacro:if value="$(arg litearm_export_diagnostics)">
+        <state_interface name="temperature_mos"/>
+        <state_interface name="temperature_coil"/>
+        <state_interface name="error_code"/>
+        <state_interface name="feedback_age"/>
+      </xacro:if>
+    </joint>
+  </xacro:macro>
+
+  <ros2_control name="LitearmSystem" type="system">
+    <hardware>
+      <plugin>litearm_ros2_control/LitearmSystem</plugin>
+      <param name="shm_name">$(arg litearm_shm_name)</param>
+      <param name="default_kp">$(arg litearm_default_kp)</param>
+      <param name="default_kd">$(arg litearm_default_kd)</param>
+      <param name="export_diagnostic_interfaces">$(arg litearm_export_diagnostics)</param>
+      <param name="connect_timeout_s">$(arg litearm_connect_timeout_s)</param>
+      <param name="heartbeat_timeout_s">$(arg litearm_heartbeat_timeout_s)</param>
+      <param name="disable_on_shutdown">$(arg litearm_disable_on_shutdown)</param>
+    </hardware>
+
+    <xacro:litearm_joint_interfaces name="joint1"/>
+    <xacro:litearm_joint_interfaces name="joint2"/>
+    <xacro:litearm_joint_interfaces name="joint3"/>
+    <xacro:litearm_joint_interfaces name="joint4"/>
+    <xacro:litearm_joint_interfaces name="joint5"/>
+    <xacro:litearm_joint_interfaces name="joint6"/>
+    <xacro:litearm_joint_interfaces name="joint7"/>
+  </ros2_control>
+
+</robot>

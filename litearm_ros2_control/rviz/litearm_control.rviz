@@ -1,0 +1,129 @@
+# litearm 控制栈 RViz 配置（无 MoveIt 面板；MoveIt 版见 litearm_moveit_config）。
+#
+# 关于 Description Topic 的 Durability Policy
+# ------------------------------------------
+# 必须是 Transient Local：robot_state_publisher 以 transient_local 发布
+# /robot_description（锁存，新订阅者也能拿到最后一条）。若这里写成 Volatile，
+# RViz 在 RSP 之后启动就连不上那条锁存消息，表现为"RViz 起来了但没有机器人"。
+#
+# 关于插件类名
+# ------------
+# 本文件里的 Class 名都必须在 rviz_default_plugins / rviz_common 的插件描述里
+# 真实存在。写错名字不会阻止 RViz 启动，只会在日志里刷
+# "The plugin for class '...' failed to load" 然后那张显示不出现 ——
+# 从界面上看就是"少了东西"，很难联想到是配置写错。改本文件时请核对
+# （扫描 $AMENT_PREFIX_PATH，不绑定发行版与安装路径）：
+#   python3 -c "import xml.etree.ElementTree as ET,glob,os; \
+#     [print(c.get('name')) for prefix in os.environ['AMENT_PREFIX_PATH'].split(':') \
+#      for p in glob.glob(prefix + '/share/*/*plugin*.xml') \
+#      for c in ET.parse(p).getroot().iter('class')]"
+Panels:
+  - Class: rviz_common/Displays
+    Help Height: 78
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /RobotModel1
+        - /TF1
+      Splitter Ratio: 0.5
+    Tree Height: 620
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Tool Properties
+    Name: Tool Properties
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 0.1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Plane: XY
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Enabled: true
+      Name: RobotModel
+      Visual Enabled: true
+      Alpha: 1
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+      Marker Scale: 0.3
+      Name: TF
+      Show Arrows: false
+      Show Axes: true
+      Show Names: true
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.6
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.06
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 0.0
+        Y: 0.0
+        Z: 0.35
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.01
+      Pitch: 0.35
+      Target Frame: base_link
+      Yaw: -0.8
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 950
+  Help:
+    collapsed: true
+  Hide Left Dock: false
+  Hide Right Dock: false
+  Selection:
+    collapsed: true
+  Tool Properties:
+    collapsed: true
+  Width: 1400

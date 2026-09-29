@@ -1,0 +1,187 @@
+# litearm_controllers.yaml — controller_manager 与控制器配置。
+#
+# 关节顺序恒为 joint1..joint7（与固件 joint frame、共享内存数组一致）。
+#
+# 关于 update_rate（2026-09-29 从 250 降到 100）
+# ---------------
+# 硬件接口的 read()/write() 是共享内存 memcpy（无锁、无串口、无 Python），
+# 所以 CM 环本身很便宜。这里的 update_rate 决定"命令刷新的粒度"和 JTC 的插值步长。
+#
+# ★ 真正的约束是**固件的状态上报率 = 100Hz**（usb_cmd.c 的 RPT_STATUS_MS=10），
+#   而**不是**"与守护进程对齐"。旧注释写"取 250Hz = 与守护进程 1:1 同步"，
+#   那条推理漏了一层：守护进程自己也是被 100Hz 的上报喂的 ⇒ 与它对齐并不能让
+#   数据更新，只是把**同一帧**重复读/写 2~3 次。
+#   实测（250Hz 时，同一份 bag）：/joint_states 里 61.7% 的样本是重复值、游程 2/3、
+#   位置曲线呈台阶；而**命令侧** controller_state 的重复率是 **0%** ⇒ 锯齿出在
+#   反馈路径，与命令通道（MOVE_JS）无关。
+#
+# 所以取 100Hz = 与**上报率**对齐：每个反馈帧恰好被读写一次。两个独立时钟仍有相位
+# 漂移（偶发 0/2 帧），但不再有系统性的 2.5:1 重复。
+# ⚠ 代价：JTC 的插值步长与 per-cycle 容差判据的时间分辨率变粗（2.5×）。
+#   若轨迹跟踪变差，可在这条与 100 之间微调；**不要高于 100** —— 那只会把重复样本
+#   重新引入（超出的采样点没有新数据可给）。
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    # 可选：逐帧透传 kp / kd 的入口。
+    # ⚠ **只在守护进程以 --mit-passthrough 启动时有效**：默认的 MOVE_JS 位置
+    #   通道里 kp/kd 取固件参数表（jp->mit_kp/mit_kd），命令帧里的 kp/kd 根本
+    #   不会被转发——挂上这两个控制器不会有任何效果。
+    #   默认通道下要调刚度请改固件参数（0x22 / USB 工具），或在 litearm_hw.yaml
+    #   里切 mit_passthrough 后重启守护进程。
+    litearm_kp_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    litearm_kd_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    # 伺服控制器（litearm_servo_control 包）。**默认加载但不激活**：
+    # 它和 JTC 都认领 joint1..7 的 position+velocity，同一时刻只能有一个激活，
+    # 所以启动时用 spawner --inactive 把它挂在那里，真要用时再显式交接：
+    #   ros2 run litearm_servo_control servo_switch.py --to servo
+    # 为什么不直接复用 JTC：JTC 是「轨迹跟随器」不是「透传器」，流式单点命令
+    # 会被插值、且「轨迹终点」判据会被持续评估，超差即中止整条轨迹
+    # （error_code=-4）。详见 litearm_servo_control/README.md。
+    litearm_servo_controller:
+      type: litearm_servo_control/LitearmServoController
+
+# ── 关节轨迹控制器（主力）────────────────────────────────────────────────────
+#
+# command_interfaces 只能取以下组合之一（Humble 版 JTC 的硬约束）：
+#   [position]                      —— 纯位置
+#   [position, velocity]            —— 位置 + 速度前馈     ← 本配置
+#   [position, velocity, acceleration]  —— 再加加速度前馈
+#   [effort]                        —— 仅力矩（必须单独使用）
+#
+# 这里选 [position, velocity]：守望进程默认的 MOVE_JS 通道只消费这两个字段，
+# 映射到固件的 (q_ref, dq_ref)，固件内部执行
+#   tau = kp·(q_ref−q) + kd·(dq_ref−dq) + G(q) + 摩擦 + 积分 + kd_extra
+#
+# ⚠ 为什么**不**要 acceleration：
+#   加速度前馈 M(q)·q̈ 现在算在固件里，而且**只在 MOVE_J 模式下算**
+#   （MOVE_JS 没有加速度源，固件源码注释："无加速度源(梯形限幅, 非 S 曲线):
+#   M·ddq 不猜"）。所以 JTC 再怎么给 acceleration 也到不了任何地方 ——
+#   声明它只会让人以为"惯量前馈开着"。
+#   真需要 M·q̈ 那条路请用 --mit-passthrough 自己算，并把这里改成
+#   [position, velocity, effort]（effort 必须单独用或与 position 组合见 JTC 约束）。
+#
+# ⚠ 同理不要 effort：默认通道的 MOVE_JS **刻意不带 tau_ff** —— 固件的
+#   builtin_mode 要求 `MOVE_JS && !s_js_user_ff`，载荷里一旦出现 tau（哪怕全 0）
+#   就把整套内置前馈（G/摩擦/积分/kd_extra/量化补偿）关掉。见 hw_daemon.py。
+joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+      - joint7
+    command_interfaces: [position, velocity]
+    state_interfaces: [position, velocity]
+
+    # 跟踪容差取固件的 following_error 判据：
+    # [0.35, 0.35, 0.30, 0.30, 0.25, 0.25, 0.25] rad。
+    #
+    # ⚠️ 不要随手往紧里调。JTC 一旦发现 |参考位置 − 实测位置| 超差，就会
+    # **中止整条轨迹**（报 "State tolerances failed" + error_code=-4），
+    # 而不是只记一条警告。这组数字是工程自己的"跟得上"判据：**固件的
+    # safety_check 用的就是它**（params/defaults.c 的 joint[].following_error，
+    # 触发后固件会置 joint_fault 并失能该轴）。比它更紧会先于固件误判失控。
+    #
+    # 一致性由 test/test_controller_config.py 守着：断言这里的 trajectory
+    # 容差不得小于固件参数表的 following_error。
+    # goal 容差取 0.02：固件的 goal 判据是 0.015，留一点余量给前馈残差
+    # （模型/负载参数不准时）导致的稳态下垂。
+    constraints:
+      stopped_velocity_tolerance: 0.03   # = 固件 stopped_velocity 判据
+      goal_time: 3.0                     # = 固件 goal 窗口
+      joint1: {trajectory: 0.35, goal: 0.02}
+      joint2: {trajectory: 0.35, goal: 0.02}
+      joint3: {trajectory: 0.30, goal: 0.02}
+      joint4: {trajectory: 0.30, goal: 0.02}
+      joint5: {trajectory: 0.25, goal: 0.02}
+      joint6: {trajectory: 0.25, goal: 0.02}
+      joint7: {trajectory: 0.25, goal: 0.02}
+
+    allow_partial_joints_goal: false
+    open_loop_control: false
+    allow_integration_in_goal_trajectories: true
+
+# ── kp / kd 透传入口（仅 --mit-passthrough 有效）──────────────────────────────
+#
+# 用法：往 <name>/commands 发 Float64MultiArray（7 个元素，顺序 joint1..joint7）：
+#
+#   ros2 topic pub -1 /litearm_kp_controller/commands \
+#     std_msgs/msg/Float64MultiArray "{data: [150,150,150,150,20,20,20]}"
+#
+# ⚠ 前提：守护进程以 --mit-passthrough 启动。默认的 MOVE_JS 通道下这两个
+#   控制器是**完全惰性**的（命令帧里的 kp/kd 不转发给固件），挂上去不会报错
+#   也不会有任何效果。
+# 注意：kp/kd 最终是"电机固件内的 MIT 增益"，改小即变软（外力可推动）、
+# 改大即变硬。kd 范围为 (0,5]，kd=0 会震荡。
+litearm_kp_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6, joint7]
+    interface_name: kp
+
+litearm_kd_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6, joint7]
+    interface_name: kd
+
+# ── 伺服控制器（litearm_servo_control）────────────────────────────────────────
+#
+# 输入：moveit_servo 流式下发的 trajectory_msgs/JointTrajectory
+#       （一个轨迹点，含 positions 与 velocities）。**必须是 JointTrajectory**：
+#       Float64MultiArray 只能装一个字段（positions 与 velocities 是 else-if，
+#       见 servo_calcs.cpp 的输出分支），而本机固件要求位置与速度同时给。
+# 输出：joint1..7 的 position + velocity 两条命令接口 —— 等价于固件要的
+#       (q_ref, dq_ref)。**不能只写位置**：velocity=0 会让固件冻结参考、关节不动。
+#
+# 与 JTC 互斥（两者都认领同两条接口），交接：
+#   ros2 run litearm_servo_control servo_switch.py --to servo|moveit|--status
+#
+# ⚠ 交接必须在**臂静止**时做；脚本默认会拒绝在运动中的切换（--force 可跳过）。
+litearm_servo_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6, joint7]
+
+    # moveit_servo 的 command_out_topic 要指向这里（见 litearm_manipulation 的
+    # config/servo_config.yaml）。用**绝对名**写死：`~/` 在 YAML 里能否解析成
+    # 控制器自己的节点名不直观，而这里必须和 servo 侧的发布目标逐字一致。
+    joint_trajectory_topic: /litearm_servo_controller/joint_trajectory
+
+    # 命令断流判据：超过这么久没有新命令就写 velocity=0 冻结参考。
+    # 取 0.2s：moveit_servo 的 publish_period 是 0.034s（≈29Hz，见 servo_config.yaml），
+    # 再加视觉侧的采样抖动，0.2s 约等于「连丢 5~6 帧」才判定断流 ——
+    # 既不会因为偶发丢帧误冻结，又能在真正断流时快速收手。
+    command_timeout_s: 0.2
+
+    # 速度硬钳位（rad/s）。**这是失控护栏，不是整定旋钮。**
+    # moveit_servo 在 command_in_type: speed_units 下 PID 输出直接是 m/s，
+    # 没有硬饱和（见 SERVO_DESIGN.md §6.5），所以钳位放在这里。
+    # 1.0 rad/s ≈ 57°/s：远高于接近段任何合法运动量级（TCP 3cm/s 对应关节量级
+    # ~0.06 rad/s），又远低于会触发固件超速安全（speed_limit → joint_fault）的量级。
+    # 真机整定后可以收紧；0 = 关闭钳位（不推荐）。
+    max_velocity: 1.0
+
+# ── 纯力矩模式（仅 --mit-passthrough，备用）───────────────────────────────────
+#
+# 想用 JTC 直接下发力矩而不是位置时，把上面 joint_trajectory_controller 的
+# command_interfaces 换成 [effort]（Humble 的 JTC 里必须单独使用），
+# **并且**把 kp/kd 归零 —— 否则固件内部仍会执行 kp·(q_ref−q) 的位置环，
+# effort 只是叠加的前馈（而且那是 MIT_ALL 的语义：固件不叠任何自家前馈）：
+#
+#   ros2 topic pub -1 /litearm_kp_controller/commands \
+#     std_msgs/msg/Float64MultiArray "{data: [0,0,0,0,0,0,0]}"
+#
+# 此时务必确认机械臂已被支撑：kp=0 意味着没有位置保持力。
