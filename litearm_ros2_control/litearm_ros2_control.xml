@@ -1,0 +1,13 @@
+<library path="litearm_ros2_control">
+  <class
+    name="litearm_ros2_control/LitearmSystem"
+    type="litearm_ros2_control::LitearmSystem"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>
+      litearm 七轴机械臂的 ros2_control 系统硬件接口。
+      本体不直接访问 USB/CAN：经 seqlock 保护的共享内存与 Python 守护进程
+      （litearm_hw_daemon，独占 USB CDC 与 litearm-stm32 固件通信）交换命令与
+      关节状态，因此 read()/write() 是无锁 memcpy，实时环中不含 Python。
+    </description>
+  </class>
+</library>

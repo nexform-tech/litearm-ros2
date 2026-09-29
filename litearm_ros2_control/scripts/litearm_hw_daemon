@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""litearm_hw_daemon — 硬件守护进程入口脚本。
+
+真正的实现在 ``litearm_ros2_control.hw_daemon``；这里只做转发，
+让 ROS 侧可以用 ``ros2 run litearm_ros2_control litearm_hw_daemon`` 启动。
+"""
+
+import sys
+
+from litearm_ros2_control.hw_daemon import main
+
+if __name__ == "__main__":
+    sys.exit(main())

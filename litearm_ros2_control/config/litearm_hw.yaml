@@ -1,0 +1,81 @@
+# litearm_hw.yaml — 硬件守护进程的 PC 侧运行参数（**可选**）。
+#
+# 用法：ros2 launch litearm_ros2_control litearm_control.launch.py \
+#           hw_config:=<本文件的绝对路径>
+# 或直接：litearm_hw_daemon --hw-config <路径>
+#
+# 优先级：**命令行 > 本文件 > 代码里的默认值**。
+# 所以临时改一个值不必来编辑这里，直接加命令行参数即可（反过来不行——
+# 文件压不过命令行，这是刻意的：临时改动不该被一次忘记删掉的文件悄悄覆盖）。
+#
+# ⚠ 这里**只放 PC 侧概念**。关节级参数（kp / kd / tau_max / 软限位 /
+#   ff_mask / kd_extra / hold_kp_gain）的唯一真源是**固件参数表**，
+#   守护进程启动时用 0x24 / 0x2B / 0x2C 读回，并打印在启动日志的
+#   「固件身份」块里。在这里再写一份就是第二份真相——改了一处没改另一处，
+#   表现是"设了没反应"，而且很难查。
+#
+# 未知键会**直接报错**（不会静默忽略）。这是刻意的：配置文件里打错一个字母
+# 却沿用旧值，是最难查的一类问题。
+
+transport:
+  # USB CDC 设备路径。留空 = 按 VID:PID 1d50:606f 从 /sys/class/tty 自动发现
+  # （板子重新枚举后设备名可能变，自动发现更省事；显式指定更适合多板卡场景）。
+  port: ""
+
+  # 命令下发频率。**2026-09-29 从 250 降到 100**，理由是实测出来的：
+  #
+  # 固件只以 **100Hz** 主动上报状态（usb_cmd.c 的 RPT_STATUS_MS=10）。下发频率高于它
+  # 并不会让反馈更新 —— 只是让守护进程把**同一帧**重复写进共享内存。250Hz 时实测：
+  # /joint_states 里 **61.7%** 的样本是重复值（理论 1−100/250 = 60%）、游程恰好 2/3，
+  # 位置曲线呈台阶；对台阶做差分，就是现场看到的"锯齿"。
+  # 降到 100Hz 与上报率对齐后，重复样本降到接近 0（只剩两个独立时钟的相位漂移）。
+  #
+  # 余量仍充足：固件命令看门狗 100ms ⇒ 10ms 一帧有 10× 余量（原来是 25×）。
+  # 固件控制环仍是 300Hz，它按 dq_ref 自己对参考做 slew，命令来得疏不会让它停。
+  rate_hz: 100.0
+
+  # 命令帧陈旧阈值：超过它就把"ROS 侧控制环停了"判为真，转入持位。
+  # 必须 >= 一个控制周期，且明显小于固件的 100ms 看门狗，这样守护进程能
+  # 先于固件做出反应（主动发持位参考，比固件的 fail-soft 0.6× 刚度更好）。
+  command_timeout_s: 0.1
+
+  # 状态帧陈旧阈值：固件 100Hz 主动上报，超过它认为链路断了。
+  feedback_timeout_s: 0.08
+
+  # 连接失败（端口不在 / 固件没应答 / 使能没成）后的重试间隔。
+  connect_retry_s: 2.0
+
+  # ENABLE 后等「真正加磁」（状态帧 enabled 位）的超时。固件是两段的：
+  # ACK 只表示登记，反馈齐了才加磁。热机时通常 <100ms，冷启动/反馈丢失时更久。
+  arm_timeout_s: 5.0
+
+  # 启动期配置查询（版本/关节参数/ff_mask）的单条应答超时。固件 TX 是"忙则丢"，
+  # 应答可能丢，所以这是"等多久算丢"而不是"多久必须回"。
+  request_timeout_s: 0.5
+
+policy:
+  # 命令通道：
+  #   false = MOVE_JS 位置模式（默认）：PD 与重力/摩擦/积分/kd_extra 前馈
+  #           全由固件算，代价是没有 M·q̈ 与 C·q̇（MOVE_JS 无加速度源）。
+  #   true  = MIT_ALL 全透传：kp/kd/effort 逐帧生效、固件不叠任何前馈，
+  #           前馈由 ROS 侧或使用者提供。用于 A/B 对照与"我要自己算"。
+  mit_passthrough: false
+
+  # 退出前继续下发持位参考的秒数。这段时间固件仍叠重力前馈，臂稳稳不动；
+  # 之后发 0x20 park（1.0× 刚度但 tau=0，会有轻微下垂）。
+  # 0 = 直接 park 退出。收栈期间第二次 Ctrl-C 立即跳过。
+  exit_hold_s: 2.0
+
+  # 前馈覆盖：**默认空 = 完全不碰固件的 ff_mask**（固件自己有出厂掩码）。
+  # 只写想改的那几项，其余保持固件现状；写完守护进程会读回校验。
+  #
+  #   gravity   → FF_G
+  #   friction  → FF_FRICTION
+  #   inertia   → FF_INERTIA|FF_CORIOLIS（⚠ MOVE_JS 下固件不算惯量项，置位无用）
+  #   integral  → FF_INTEGRAL
+  #   damping   → kd_extra 向量（无独立 FF 位；false = 清零）
+  #
+  # 退回纯 PD 做 A/B 对照：
+  #   ff_overrides: {gravity: false, friction: false, inertia: false,
+  #                  integral: false, damping: false}
+  ff_overrides: {}
