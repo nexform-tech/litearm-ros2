@@ -310,4 +310,4 @@ litearm-ros2/
 - Developer guide & API reference (interface details, pose conventions, core
   internals): [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
 - 中文使用说明：[README.zh-CN.md](README.zh-CN.md)
-- License: see `package.xml` (`MIT`).
+- License: Apache-2.0. See [LICENSE](LICENSE) and the `package.xml` of each package.

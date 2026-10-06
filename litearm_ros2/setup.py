@@ -35,7 +35,7 @@ setup(
     maintainer="luochun",
     maintainer_email="56000204@qq.com",
     description="ROS2 (Humble) bridge package for the LiteArm robotic arm.",
-    license="MIT",
+    license="Apache-2.0",
     entry_points={
         "console_scripts": [
             "litearm_node = litearm_ros2.litearm_node:main",

@@ -301,4 +301,4 @@ litearm-ros2/
 - 开发指南与 API 参考（接口细节、位姿约定、核心内部实现）：
   [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
 - English: [README.md](README.md)
-- 许可证：见 `package.xml`（`MIT`）。
+- 许可证：Apache-2.0，见 [LICENSE](LICENSE) 及各包的 `package.xml`。
