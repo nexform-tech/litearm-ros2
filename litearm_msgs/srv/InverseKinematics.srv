@@ -1,0 +1,13 @@
+# Firmware background IK: pose -> joint angles (SDK Arm::ik).
+#
+# seed is optional and always seven values: the solver runs on the 7-axis model even
+# on a bench unit, and empty means "derive a seed from the measured position". This
+# one solves; it does not move the arm, and is available without allow_motion.
+
+float64[6] pose
+float64[] seed
+float64 timeout
+---
+bool success
+string message
+float64[] q

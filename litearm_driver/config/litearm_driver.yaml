@@ -1,0 +1,17 @@
+# Parameters of litearm_driver. Every one is optional; these are the defaults.
+#
+# `joint_names` is deliberately absent: an empty list cannot be typed in YAML. Leave the
+# parameter unset and the node derives joint1..jointN from the axes the firmware reports.
+/**:
+  ros__parameters:
+    port: ""                        # empty = auto-discovery by VID:PID 1d50:606f
+    auto_enable: true               # a refused ENABLE fails the activation
+    enable_attempts: 12
+    status_rate_hz: 10.0
+    publish_joint_states: false     # keep false while joint_state_broadcaster runs
+    joint_states_topic: /joint_states
+    publish_diagnostics: true
+    diagnostics_rate_hz: 1.0
+    zero_g_keepalive_period_s: 0.04 # [0.005, 0.10)
+    allow_dfu: false                # enter_dfu is refused until this is true
+    frame_id: ""

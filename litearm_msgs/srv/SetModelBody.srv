@@ -1,0 +1,9 @@
+# Write one body of the dynamics model into RAM (SDK ModelParams::set_body).
+#
+# Staged, not persistent: commit_model writes it to flash and revert_model drops it.
+
+int32 body
+float64[] values
+---
+bool success
+string message

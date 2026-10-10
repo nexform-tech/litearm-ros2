@@ -1,0 +1,10 @@
+# Joint-space move, every axis on one synchronised S-curve (SDK Arm::movej_sync).
+#
+# Same payload as MoveJ; the axes arrive together instead of each on its own curve.
+# Blocks until the move finishes. Refused unless allow_motion:=true.
+
+float64[] q
+float64 speed
+---
+bool success
+string message

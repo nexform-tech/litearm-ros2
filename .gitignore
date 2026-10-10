@@ -1,12 +1,20 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-.eggs/
+# colcon workspace layout, when this package is built in place
 build/
-devel/
 install/
-.logs/
 log/
-.pytest_cache/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+Testing/
+*.o
+*.a
+*.so
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

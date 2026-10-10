@@ -1,0 +1,10 @@
+# Read one body of the dynamics model (SDK ModelParams::get_body).
+#
+# body 0 is the base; the SDK and the firmware agree on the index range. The values
+# are the model's own order, not a ROS convention.
+
+int32 body
+---
+bool success
+string message
+float64[] values

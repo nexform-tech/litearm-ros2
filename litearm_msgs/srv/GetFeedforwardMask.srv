@@ -1,0 +1,10 @@
+# Read the feedforward enable mask (SDK Arm::get_ff_mask).
+#
+# The bits are the firmware's own; without this readback there is no way to tell a
+# mask that was written from one the firmware actually kept.
+
+
+---
+bool success
+string message
+uint32 mask

@@ -1,0 +1,7 @@
+# Read the firmware's joint parameter table (CMD_GET_JOINT_PARAM).
+
+int32 joint            # axis index; -1 returns every axis
+---
+bool success
+string message
+litearm_msgs/JointParam[] params

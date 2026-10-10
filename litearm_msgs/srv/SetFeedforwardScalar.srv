@@ -1,0 +1,11 @@
+# Write one feedforward scalar (firmware CMD_SET_FF_SCALAR).
+#
+# Read it back with get_feedforward_scalar before trusting it: the firmware clamps
+# silently and ACKs the clamped value.
+
+int32 item             # see litearm::Arm::ff_scalar_items()
+int32 sub              # only meaningful for items 5 and 6 (0..2)
+float64 value
+---
+bool success
+string message

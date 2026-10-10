@@ -1,0 +1,28 @@
+# One host-side and firmware-side diagnostic snapshot (SDK read-only accessors plus
+# Arm::host_stats and Arm::cart_supported).
+#
+# Nothing here is a measurement of the arm; it is what this process has seen and how
+# many frames it could not use, which is what distinguishes "the link is quiet" from
+# "the two ends disagree about the frame format".
+
+
+---
+bool success
+string message
+bool connected
+bool in_dfu
+bool cart_supported
+bool cart_probe_silent
+int32 joint_count
+uint64 status_seq
+string port
+string firmware
+string banner_version
+string last_reset_reason
+uint64 dropped             # frames discarded because the waiting queue was full
+uint64 bad_status_frames   # CRC-valid frames this decoder could not parse
+uint64 flush_failures      # writes that were not guaranteed to leave the host
+uint64 cart_evicted_unclaimed
+uint64 cart_extra_replies
+uint8[] msg_ids
+float64[] msg_hz

@@ -1,0 +1,10 @@
+# Write the feedforward enable mask (firmware CMD_SET_FF_FLAGS).
+#
+# Only bits inside FF_ALL are accepted. The driver refuses anything outside that range
+# instead of letting the firmware fold an unknown bit into "all feedforward off", which
+# would silently remove gravity compensation.
+
+uint32 mask
+---
+bool success
+string message

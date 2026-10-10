@@ -1,0 +1,11 @@
+# Pose move: the firmware solves the IK and walks its own S-curve (SDK Arm::move_p).
+#
+# pose is [x, y, z, roll, pitch, yaw]. wait=false returns as soon as the firmware has
+# accepted the plan; poll_cart reports the outcome. Refused unless allow_motion:=true.
+
+float64[6] pose
+float64 speed
+bool wait
+---
+bool success
+string message

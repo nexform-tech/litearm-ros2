@@ -1,0 +1,10 @@
+# Read one feedforward vector back (SDK Arm::get_ff_vec).
+#
+# The vector length depends on the item: 3 for the gravity vector, 7 elsewhere.
+# Use get_feedforward_catalog for the item numbers and names.
+
+int32 item
+---
+bool success
+string message
+float64[] values

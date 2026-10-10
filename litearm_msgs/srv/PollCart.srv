@@ -1,0 +1,16 @@
+# Outcome of an in-flight cartesian request (SDK Arm::poll_cart).
+#
+# pending=true means the firmware has not answered yet. err is the firmware's own
+# cartesian error code and is only meaningful when the plan has been reported.
+
+
+---
+bool success
+string message
+bool pending
+bool settled
+int32 err
+int32 waypoints
+uint32 plan_us
+float64 settle_err_rad
+float64[] q_final

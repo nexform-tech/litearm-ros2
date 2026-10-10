@@ -1,0 +1,21 @@
+# Firmware kinematics/dynamics benchmark (SDK Diagnostics::kin_bench).
+#
+# raw is the firmware's own text, kept verbatim because the parser is deliberately
+# conservative: timings holds one "name=n,avg,max" entry per block it recognised.
+# The counters are the ones the firmware names itself; 0 means "not reported", not
+# "no errors".
+
+float64 timeout           # seconds to wait for the reply; <= 0 uses the SDK default
+---
+bool success
+string message
+string raw
+string[] timings
+int64 crc_errors
+int64 reply_dropped
+int64 can_tx_fail
+int64 loop_max_kcycle
+int64 loop_overruns
+int64 rx_fifo_lost_motor
+int64 rx_fifo_lost_bridge
+int64 gsusb_ring_drops

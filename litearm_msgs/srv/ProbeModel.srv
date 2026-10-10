@@ -1,0 +1,10 @@
+# Probe whether the firmware exposes its dynamics model store (SDK Arm::model().probe()).
+#
+# Older firmware answers nothing; the SDK reports that as "not supported" rather than
+# as an error.
+
+
+---
+bool success
+string message
+bool supported

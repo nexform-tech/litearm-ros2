@@ -1,0 +1,17 @@
+# Send one MOVE_JS frame: the streaming primitive the control stack uses (SDK
+# Arm::move_js).
+#
+# This is a single frame, not a stream. The firmware's command watchdog trips 100 ms
+# after the last frame, so one frame only holds that long -- continuous servo needs a
+# caller that re-sends, which is what litearm_ros2_control's write() does. dq doubles
+# as the slew limit of the position reference; with dq all zero the firmware freezes
+# its own reference and refuses a target more than 5 mrad away. Leave tau_ff empty to
+# keep the firmware's built-in feedforward, which supplying tau switches off.
+# Refused unless allow_motion:=true.
+
+float64[] q               # one reference per axis; empty is rejected by the SDK
+float64[] dq              # empty means all zero
+float64[] tau_ff          # empty means "let the firmware compute it"
+---
+bool success
+string message

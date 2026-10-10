@@ -1,0 +1,12 @@
+# Joint-space move with the firmware's per-axis S-curve (SDK Arm::movej).
+#
+# Blocks until the move finishes or the SDK's deadline expires. speed is a fraction
+# of full speed, 0 < speed <= 1 -- 30 means 30x, not 30 percent; use
+# set_speed_scaling for a percentage. Refused unless the node is started with
+# allow_motion:=true.
+
+float64[] q               # one target per axis, in joint order (joint1..jointN)
+float64 speed
+---
+bool success
+string message

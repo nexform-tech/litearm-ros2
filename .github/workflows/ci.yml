@@ -1,7 +1,13 @@
+# Test gate for this repository: the litearm maintenance driver and its message package.
+#
+# Tests live in their own workflow: they run on pull requests, while the release
+# workflow runs on pushes to the default branch. Mixing the two means a broken
+# release blocks a pull request, or the reverse.
+#
+# AGENTS.md is deliberately not linted: it is canonical content synced from
+# repo-template and must not be edited here.
 name: CI
 
-# Test gate for this repository. It runs on pull requests and on pushes to the
-# default branch; releases live in their own workflow (see .github/workflows/release.yml).
 on:
   pull_request:
   push:
@@ -19,20 +25,95 @@ concurrency:
 jobs:
   # The job must be named `test`: that is the required status check.
   test:
+    # Humble targets Ubuntu 22.04.
+    runs-on: ubuntu-22.04
+    container: ros:humble
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # The packages are at ws/src/litearm-ros2/litearm_driver and .../litearm_msgs.
+          path: ws/src/litearm-ros2
+
+      # CMakeLists.txt builds the litearm-cpp tree when no installed litearm package is
+      # found, so the SDK has to sit next to this repository in the workspace source
+      # directory: its default LITEARM_CPP_DIR is <package>/../../litearm-cpp.
+      - name: Checkout litearm-cpp
+        uses: actions/checkout@v4
+        with:
+          repository: nexform-tech/litearm-cpp
+          path: ws/src/litearm-cpp
+
+      # Installed by name rather than through rosdep: `depend>litearm</depend>`
+      # in package.xml is deliberately not a rosdep key.
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            build-essential \
+            cmake \
+            python3-colcon-common-extensions \
+            ros-humble-ament-cmake \
+            ros-humble-ament-cmake-gtest \
+            ros-humble-rclcpp \
+            ros-humble-rclcpp-lifecycle \
+            ros-humble-rosidl-default-generators \
+            ros-humble-rosidl-default-runtime \
+            ros-humble-std-srvs \
+            ros-humble-sensor-msgs \
+            ros-humble-diagnostic-msgs
+
+      - name: Build
+        shell: bash
+        working-directory: ws
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --event-handlers console_direct+
+
+      - name: Test
+        shell: bash
+        working-directory: ws
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test --event-handlers console_direct+
+          # `colcon test` reports success even when a test fails; this is the gate.
+          colcon test-result --verbose
+
+  # Repository standards and documentation. A separate job so that a broken build
+  # and a lint failure are distinguishable at a glance.
+  lint:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
+          node-version: 22
 
-      - name: Install
+      - name: Lint Markdown
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest
+          npx --yes markdownlint-cli2@0.23.3 \
+            "README.md" "README.zh-CN.md" \
+            "docs/*.md" \
+            "litearm_driver/README.md" "litearm_driver/README.zh-CN.md" \
+            "litearm_msgs/README.md"
 
-      - name: Test
-        run: PYTHONPATH=litearm_ros2/src pytest litearm_ros2/tests -q
+      - name: Validate repository standards
+        run: |
+          set -euo pipefail
+          test -s README.md
+          test -s README.zh-CN.md
+          test -s AGENTS.md
+          test -s LICENSE
+          test -s docs/quickstart.md
+          test -s docs/quickstart.zh-CN.md
+          test -s docs/command-set.md
+          test -s docs/command-set.zh-CN.md
+          python3 -c "import json; json.load(open('.releaserc.json'))"
+          python3 -c "import json; json.load(open('.markdownlint.json'))"
+          for manifest in litearm_driver/package.xml litearm_msgs/package.xml; do
+            python3 -c "import xml.dom.minidom, sys; xml.dom.minidom.parse(sys.argv[1])" "$manifest"
+          done
+          echo "repository standards OK"

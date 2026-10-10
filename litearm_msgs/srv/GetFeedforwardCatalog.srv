@@ -1,0 +1,13 @@
+# The SDK's feedforward item tables (SDK Arm::ff_vec_items and friends).
+#
+# Static tables, not a firmware read: they say which item numbers exist and what they
+# are called. Entries are "item: name". The read-only list is the subset that cannot
+# be written through set_feedforward_scalar.
+
+
+---
+bool success
+string message
+string[] vector_items
+string[] scalar_items
+string[] scalar_read_only_items

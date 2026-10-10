@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>litearm_driver</name>
+  <version>1.0.0</version>
+  <description>
+    Standalone maintenance driver for the LiteArm arm: a lifecycle node that owns the USB
+    CDC link through the litearm C++ SDK and exposes the SDK's administrative command set
+    as ROS 2 services and a status topic. It is mutually exclusive with the ros2_control
+    stack, because both open the same serial port.
+  </description>
+  <maintainer email="wurihao@nexform.tech">thetooler</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>std_srvs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>litearm_msgs</depend>
+
+  <!-- The litearm C++ SDK. It is a plain CMake package, not a rosdep key. CMakeLists
+       prefers an installed litearm (find_package) and otherwise builds the litearm-cpp
+       source tree beside this repository, so a plain `colcon build` needs no manual
+       install step. -->
+  <depend>litearm</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

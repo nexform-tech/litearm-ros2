@@ -1,0 +1,10 @@
+# Take a status snapshot on demand (firmware CMD_GET_STATUS).
+#
+# Use this when the passive 100 Hz stream is silent and you need proof of life with a
+# deadline, rather than waiting for the next /litearm/status publication.
+
+float64 timeout        # seconds; <= 0 means "return the cached frame immediately"
+---
+bool success
+string message
+litearm_msgs/LitearmStatus status

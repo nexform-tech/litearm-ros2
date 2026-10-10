@@ -1,0 +1,7 @@
+# Read the joint-space model terms (SDK ModelParams::get_jm).
+
+
+---
+bool success
+string message
+float64[] values
