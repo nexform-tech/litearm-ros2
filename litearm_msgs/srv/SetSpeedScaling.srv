@@ -1,0 +1,10 @@
+# Set the firmware's global speed governor (firmware CMD_SET_SPEED_PERCENT).
+#
+# This is an integer percentage, not a 0..1 fraction: percent 1 means one percent of full
+# speed. It is global and persists until changed, unlike the per-move speed argument of
+# the SDK's movej.
+
+uint8 percent          # 0..100
+---
+bool success
+string message

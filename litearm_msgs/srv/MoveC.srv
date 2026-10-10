@@ -1,0 +1,19 @@
+# Circular cartesian move through a via pose (SDK Arm::move_c).
+#
+# The firmware plans the arc start -> via -> end and plays it; the response carries
+# the same plan report as MoveL. Refused unless allow_motion:=true.
+
+float64[6] start
+float64[6] via
+float64[6] end
+float64 speed
+bool wait
+---
+bool success
+string message
+bool settled
+int32 err
+int32 waypoints
+uint32 plan_us
+float64 settle_err_rad
+float64[] q_final

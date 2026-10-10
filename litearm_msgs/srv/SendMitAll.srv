@@ -1,0 +1,14 @@
+# Whole-arm MIT passthrough, one frame (SDK Arm::send_mit_all).
+#
+# Every array is one value per axis in joint order and they must all be the same
+# length. The firmware applies them as given: no built-in feedforward, no clamping
+# beyond the motor limits. Refused unless allow_motion:=true.
+
+float64[] q
+float64[] dq
+float64[] kp
+float64[] kd
+float64[] tau
+---
+bool success
+string message

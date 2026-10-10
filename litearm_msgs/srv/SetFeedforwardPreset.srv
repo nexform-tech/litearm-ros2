@@ -1,0 +1,6 @@
+# Select a feedforward preset (firmware CMD_FF_PRESET).
+
+int32 preset           # 0 = all off, 1 = factory, 2 = all on
+---
+bool success
+string message

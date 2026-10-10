@@ -1,0 +1,9 @@
+# Model store status: override level, staged mask, dirty flag (SDK ModelParams::status).
+
+
+---
+bool success
+string message
+int32 override_level
+uint32 staged_mask
+int32 dirty

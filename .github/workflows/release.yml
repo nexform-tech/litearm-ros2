@@ -30,3 +30,8 @@ jobs:
   release:
     # Pin to a moving major tag (`@v1`), or to a commit SHA for maximum safety.
     uses: nexform-tech/repo-template/.github/workflows/release.yml@v1
+    # Nothing else is needed to start on the 0.x line: the workflow bootstraps
+    # `v0.0.0` once, so the first `feat:` is `0.1.0`. A repository that must keep
+    # semantic-release's 1.0.0 first release disables the bootstrap explicitly.
+    # with:
+    #   initial-version: ""

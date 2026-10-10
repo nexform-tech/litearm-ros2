@@ -1,0 +1,10 @@
+# Write the firmware's motion mode (firmware CMD_SET_MOTION_MODE).
+#
+# The current firmware recognises mode 0 only, which is the same thing as park(): a
+# declared static hold at full stiffness. The SDK rejects other values loudly instead of
+# ACKing a mode change that does not happen. Use park() when that is what you mean.
+
+int32 mode
+---
+bool success
+string message

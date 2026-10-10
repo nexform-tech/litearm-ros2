@@ -1,0 +1,11 @@
+# Write one feedforward vector (firmware CMD_SET_FF_VEC).
+#
+# The length the firmware expects depends on the item: 7 values for items 1..5, 7 and 8,
+# 3 values for the gravity vector (item 6). The SDK rejects a wrong length with
+# InvalidCommandError, which the driver returns as this service's message.
+
+int32 item             # see litearm::Arm::ff_vec_items()
+float64[] values
+---
+bool success
+string message

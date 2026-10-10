@@ -1,0 +1,8 @@
+# Write the gravity vector the model uses (SDK Arm::set_gravity_vector).
+#
+# Three components, m/s^2. The default is gravity along the base -z.
+
+float64[3] g
+---
+bool success
+string message

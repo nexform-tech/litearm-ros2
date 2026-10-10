@@ -1,0 +1,11 @@
+# Write one axis of the joint parameter table's soft limits (firmware CMD_SET_JOINT_LIMITS).
+#
+# The limits are cached by the host at connect time, so a change here does not move the
+# SDK's local pre-check until the next connect.
+
+int32 joint            # axis index
+float64 q_min
+float64 q_max
+---
+bool success
+string message

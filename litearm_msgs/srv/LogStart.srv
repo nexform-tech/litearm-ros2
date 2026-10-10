@@ -1,0 +1,9 @@
+# Start recording the firmware's 300 Hz control ticks (SDK ArmLog::start).
+#
+# ticks is the number of control cycles to record; the firmware stops on its own when
+# the buffer (2400 samples) is full. Recording does not disturb the running loop.
+
+int32 ticks
+---
+bool success
+string message

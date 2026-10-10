@@ -1,0 +1,10 @@
+# Commit the staged model to flash (SDK ModelParams::commit).
+#
+# expected_mask is the staged mask the caller believes it wrote; the firmware refuses
+# the commit when it does not match, which is what stops a stale belief from being
+# made permanent. Read it from get_model_status.
+
+uint32 expected_mask
+---
+bool success
+string message

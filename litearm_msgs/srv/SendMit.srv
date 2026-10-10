@@ -1,0 +1,15 @@
+# One axis of raw MIT passthrough (SDK Arm::send_mit).
+#
+# The gains go straight to the motor controller for this frame; the firmware adds no
+# feedforward of its own. It is a single frame with the same watchdog limit as
+# MoveJs. Refused unless allow_motion:=true.
+
+int32 joint               # axis index
+float64 q
+float64 dq
+float64 kp
+float64 kd
+float64 tau
+---
+bool success
+string message

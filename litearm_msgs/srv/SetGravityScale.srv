@@ -1,0 +1,8 @@
+# Scale the gravity feedforward per axis (SDK Arm::set_gravity_scale).
+#
+# One value per axis; 1.0 restores the model's own gravity term.
+
+float64[] values
+---
+bool success
+string message

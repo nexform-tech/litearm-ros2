@@ -1,0 +1,8 @@
+# Write the joint-space model terms into RAM (SDK ModelParams::set_jm).
+#
+# Staged like SetModelBody; commit_model stores it.
+
+float64[] values
+---
+bool success
+string message

@@ -1,0 +1,12 @@
+# Read one feedforward scalar back from the firmware (CMD_GET_FF_SCALAR).
+#
+# Read-back is the only way to confirm a write: the firmware clamps silently, so the
+# value it ACKed is not necessarily the value it stored. item 9 is the read-only
+# extension that returns ff_mask.
+
+int32 item
+int32 sub              # only meaningful for items 5 and 6 (0..2)
+---
+bool success
+string message
+float64 value

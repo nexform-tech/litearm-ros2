@@ -1,0 +1,10 @@
+# Scale the inertia feedforward per axis (SDK Arm::set_inertia_scale).
+#
+# One value per axis. It only has an effect on a channel that carries acceleration:
+# the default MOVE_JS path has no acceleration source, so on that path this changes
+# nothing.
+
+float64[] values
+---
+bool success
+string message

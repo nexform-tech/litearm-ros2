@@ -1,0 +1,19 @@
+# Read the recorded ticks back and write them to a file (SDK ArmLog::dump through
+# LogReader::read_all).
+#
+# filename is a plain file name, not a path: it is written inside the node's log
+# directory (the log_dir parameter) and any path separator is rejected. The file holds
+# the firmware's raw sample blob -- u32 tick + q_ref[7] + dq[7] + tau[7] f32 per
+# sample.
+#
+# Set wait=true to wait for the recording started by log_start to fill first.
+
+string filename
+bool wait
+float64 timeout
+---
+bool success
+string message
+string path
+int32 bytes
+int32 samples

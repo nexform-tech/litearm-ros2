@@ -1,0 +1,11 @@
+# Set the end-effector payload the firmware compensates for (feedforward item 4 and 5).
+#
+# The firmware clamps mass into [0, 20] silently, so the driver refuses a value outside
+# that range instead of reporting success for a different number. Read the result back
+# with get_feedforward_scalar (item 4, sub 0) before trusting it.
+
+float64 mass           # kg, 0..20
+float64[3] com         # centre of mass, metres, in the flange frame
+---
+bool success
+string message
