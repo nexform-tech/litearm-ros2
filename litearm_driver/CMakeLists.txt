@@ -31,10 +31,9 @@ set(LITEARM_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../litearm-cpp"
 
 find_package(litearm CONFIG QUIET)
 
-# ⚠ The robot description package is also called `litearm`, so find_package can resolve
-# to its CMake config instead of the SDK's -- they share a name, and the description
-# package exports no target at all. Only the SDK exports litearm::litearm, so the
-# target, not litearm_FOUND, is the test for "the SDK is installed".
+# ⚠ The test for "the SDK is installed" is the target, not litearm_FOUND: only the SDK
+# exports litearm::litearm, and a package config can be located while exporting nothing
+# this package can link.
 if(litearm_FOUND AND TARGET litearm::litearm)
   message(STATUS "Using installed litearm (${litearm_DIR})")
 else()
